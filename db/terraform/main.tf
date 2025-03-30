@@ -7,9 +7,9 @@ terraform {
   }
 }
 
-# Create the secret in AWS Secrets Manager
+# Create the secret in AWS Secrets Manager for master credentials
 resource "aws_secretsmanager_secret" "aurora_credentials" {
-  name = "${var.cluster_identifier}-credentials"
+  name = "${local.name_prefix}-credentials"
 }
 
 resource "aws_secretsmanager_secret_version" "aurora_credentials" {
@@ -64,7 +64,7 @@ resource "aws_rds_cluster_instance" "aurora_instances" {
 
 # Security group
 resource "aws_security_group" "aurora" {
-  name        = "${var.cluster_identifier}-aurora-sg"
+  name        = "${local.name_prefix}-aurora-sg"
   description = "Security group for Aurora MySQL cluster"
   vpc_id      = var.vpc_id
 
@@ -82,24 +82,20 @@ resource "aws_security_group" "aurora" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
-    Name = "${var.cluster_identifier}-aurora-sg"
-  }
+  tags = local.default_tags
 }
 
 # DB subnet group
 resource "aws_db_subnet_group" "aurora" {
-  name       = "${var.cluster_identifier}-subnet-group"
+  name       = "${local.name_prefix}-subnet-group"
   subnet_ids = var.subnet_ids
 
-  tags = {
-    Name = "${var.cluster_identifier}-subnet-group"
-  }
+  tags = local.default_tags
 }
 
 # IAM role for Aurora to access Secrets Manager
 resource "aws_iam_role" "aurora_secret_access" {
-  name = "${var.cluster_identifier}-secret-access"
+  name = "${local.name_prefix}-secret-access"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -117,7 +113,7 @@ resource "aws_iam_role" "aurora_secret_access" {
 
 # IAM policy for Aurora to access Secrets Manager
 resource "aws_iam_role_policy" "aurora_secret_access" {
-  name = "${var.cluster_identifier}-secret-access"
+  name = "${local.name_prefix}-secret-access"
   role = aws_iam_role.aurora_secret_access.id
 
   policy = jsonencode({
@@ -136,7 +132,7 @@ resource "aws_iam_role_policy" "aurora_secret_access" {
 
 # Attach the IAM role to the Aurora cluster
 resource "aws_rds_cluster_role_association" "aurora_secret_access" {
-  cluster_identifier = aws_rds_cluster.aurora_cluster.id
-  role_arn          = aws_iam_role.aurora_secret_access.arn
-  feature_name      = "SecretsManager"
+  db_cluster_identifier = aws_rds_cluster.aurora_cluster.id
+  role_arn             = aws_iam_role.aurora_secret_access.arn
+  feature_name         = "SecretsManager"
 } 
